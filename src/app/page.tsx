@@ -1,101 +1,200 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import "./globals.css";
+
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  User, // Import the User type from firebase/auth
+  UserCredential,
+} from "firebase/auth";
+import firebaseApp from "../../lib/firebase";
+
+// Import Firestore functions
+import { getFirestore, doc, setDoc } from "firebase/firestore";
+
+const auth = getAuth(firebaseApp);
+const firestore = getFirestore(firebaseApp);
+
+const AuthPage = () => {
+  const router = useRouter();
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Helper function to save user data in Firestore
+  const saveUserToFirestore = async (user: User | null): Promise<void> => {
+    if (!user) return;
+    const userRef = doc(firestore, "users", user.uid);
+    // Using merge:true so that existing data is preserved if present.
+    await setDoc(
+      userRef,
+      {
+        email: user.email,
+        displayName: user.displayName || "",
+        lastLogin: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      let credential: UserCredential;
+      if (isRegistering) {
+        // Create account and return credential object
+        credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+      } else {
+        // Sign in
+        credential = await signInWithEmailAndPassword(auth, email, password);
+      }
+      // Save user details in Firestore
+      await saveUserToFirestore(credential.user);
+      // Redirect user to /navigation on success
+      router.push("/navigation");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const credential = await signInWithPopup(auth, provider);
+      // Save user details in Firestore
+      await saveUserToFirestore(credential.user);
+      // Redirect user to /navigation on success
+      router.push("/navigation");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="bg-white p-10 rounded-xl shadow-lg w-full max-w-md">
+        <h2 className="text-3xl font-bold text-center mb-8">
+          {isRegistering ? "Create Account" : "Welcome Back"}
+        </h2>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit}>
+          <div className="mb-5">
+            <label htmlFor="email" className="block text-gray-600 mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+          <div className="mb-6">
+            <label htmlFor="password" className="block text-gray-600 mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Enter your password"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-200 mb-4"
           >
-            Read our docs
-          </a>
+            {loading ? "Processing..." : isRegistering ? "Register" : "Login"}
+          </button>
+        </form>
+
+        <div className="flex items-center justify-center mb-4">
+          <span className="border-b w-1/5 lg:w-1/4"></span>
+          <span className="text-xs text-center text-gray-500 uppercase mx-2">
+            or
+          </span>
+          <span className="border-b w-1/5 lg:w-1/4"></span>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+          className="w-full py-2 px-4 border border-gray-300 rounded hover:bg-gray-100 transition-colors duration-200 flex items-center justify-center"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <svg
+            className="w-5 h-5 mr-2"
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fab"
+            data-icon="google"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 488 512"
+          >
+            <path
+              fill="currentColor"
+              d="M488 261.8C488 403.3 391.1 504 248 504 111 504 0 392.9 0 256 0 119.1 111 8 248 8c66.3 0 121 24.4 162.1 63.5l-65.6 63.5C320.3 90.4 285.2 72 248 72 152 72 72 152.1 72 256s80 184 176 184c96 0 156-68.4 161.4-164.3H248v-132h240c2.3 12.4 3.6 25.7 3.6 40z"
+            ></path>
+          </svg>
+          {loading ? "Processing..." : "Sign in with Google"}
+        </button>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-600">
+            {isRegistering
+              ? "Already have an account?"
+              : "Don't have an account?"}{" "}
+            <button
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-blue-500 hover:underline font-semibold"
+            >
+              {isRegistering ? "Login" : "Register"}
+            </button>
+          </p>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default AuthPage;
