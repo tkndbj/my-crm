@@ -13,7 +13,7 @@ import {
   User, // Import the User type from firebase/auth
   UserCredential,
 } from "firebase/auth";
-import firebaseApp from "../../lib/firebase";
+import firebaseApp from "../lib/firebase";
 
 // Import Firestore functions
 import { getFirestore, doc, setDoc } from "firebase/firestore";
